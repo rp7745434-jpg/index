@@ -1,0 +1,6 @@
+{
+  "name": "VeroMarket — Multi-Vendor Price & Seller Discovery",
+  "description": "A verified multi-vendor product and local service discovery marketplace where buyers compare regional seller prices, inspect seller locations, and send direct inquiries, while verified sellers manage localized catalogs and inventory analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

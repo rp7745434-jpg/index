@@ -1,0 +1,356 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Safety Net (Default-Deny Catch-All)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Global Hardened Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isVerifiedUser() && (
+        request.auth.token.email == 'rp7745434@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // 3. Entity Validation Blueprints (Anti-Update-Gap)
+    function isValidAdmin(data) {
+      return data.keys().hasAll(['uid', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'createdAt']) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.uid == request.auth.uid &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidSellerPublic(data) {
+      return data.keys().hasAll([
+          'ownerId', 'businessName', 'category', 'city', 'district',
+          'lat', 'lng', 'gstinMasked', 'isVerified', 'verificationStatus',
+          'serviceRadiusKm', 'responseRatePct', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId', 'businessName', 'category', 'city', 'district',
+          'lat', 'lng', 'gstinMasked', 'isVerified', 'verificationStatus',
+          'serviceRadiusKm', 'responseRatePct', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.ownerId == request.auth.uid &&
+        data.businessName is string && data.businessName.size() >= 2 && data.businessName.size() <= 100 &&
+        data.category is string && data.category.size() >= 2 && data.category.size() <= 60 &&
+        data.city is string && data.city.size() >= 2 && data.city.size() <= 60 &&
+        data.district is string && data.district.size() >= 2 && data.district.size() <= 80 &&
+        data.lat is number && data.lat >= -90 && data.lat <= 90 &&
+        data.lng is number && data.lng >= -180 && data.lng <= 180 &&
+        data.gstinMasked is string && data.gstinMasked.size() >= 5 && data.gstinMasked.size() <= 30 &&
+        data.isVerified is bool &&
+        data.verificationStatus is string && data.verificationStatus.size() <= 20 &&
+        (data.verificationStatus == 'verified' || data.verificationStatus == 'pending' || data.verificationStatus == 'rejected') &&
+        data.serviceRadiusKm is number && data.serviceRadiusKm >= 1 && data.serviceRadiusKm <= 5000 &&
+        data.responseRatePct is number && data.responseRatePct >= 0 && data.responseRatePct <= 100 &&
+        data.status is string && data.status.size() <= 20 &&
+        (data.status == 'active' || data.status == 'suspended') &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidSellerPrivate(data) {
+      return data.keys().hasAll([
+          'ownerId', 'taxIdFull', 'tradeLicenseNumber', 'isoCertRef',
+          'registeredStreet', 'contactPhone', 'contactEmail', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId', 'taxIdFull', 'tradeLicenseNumber', 'isoCertRef',
+          'registeredStreet', 'contactPhone', 'contactEmail', 'createdAt', 'updatedAt'
+        ]) &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.ownerId == request.auth.uid &&
+        data.taxIdFull is string && data.taxIdFull.size() >= 8 && data.taxIdFull.size() <= 32 &&
+        data.tradeLicenseNumber is string && data.tradeLicenseNumber.size() >= 6 && data.tradeLicenseNumber.size() <= 40 &&
+        data.isoCertRef is string && data.isoCertRef.size() >= 4 && data.isoCertRef.size() <= 40 &&
+        data.registeredStreet is string && data.registeredStreet.size() >= 5 && data.registeredStreet.size() <= 200 &&
+        data.contactPhone is string && data.contactPhone.size() >= 7 && data.contactPhone.size() <= 24 &&
+        data.contactEmail is string && data.contactEmail.size() >= 5 && data.contactEmail.size() <= 120 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidListing(data) {
+      return data.keys().hasAll([
+          'ownerId', 'sellerId', 'sellerName', 'sellerVerified', 'productGroupKey',
+          'title', 'category', 'listingType', 'price', 'unit',
+          'stockCount', 'reorderPoint', 'minOrderQty', 'leadTimeDays',
+          'description', 'city', 'district', 'lat', 'lng',
+          'visualKey', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId', 'sellerId', 'sellerName', 'sellerVerified', 'productGroupKey',
+          'title', 'category', 'listingType', 'price', 'unit',
+          'stockCount', 'reorderPoint', 'minOrderQty', 'leadTimeDays',
+          'description', 'city', 'district', 'lat', 'lng',
+          'visualKey', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.ownerId == request.auth.uid &&
+        data.sellerId is string && data.sellerId.size() >= 1 && data.sellerId.size() <= 128 && data.sellerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.sellerName is string && data.sellerName.size() >= 2 && data.sellerName.size() <= 100 &&
+        data.sellerVerified is bool &&
+        data.productGroupKey is string && data.productGroupKey.size() >= 2 && data.productGroupKey.size() <= 80 && data.productGroupKey.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.title is string && data.title.size() >= 3 && data.title.size() <= 140 &&
+        data.category is string && data.category.size() >= 2 && data.category.size() <= 60 &&
+        data.listingType is string && data.listingType.size() <= 20 &&
+        (data.listingType == 'product' || data.listingType == 'service') &&
+        data.price is number && data.price >= 0 && data.price <= 10000000 &&
+        data.unit is string && data.unit.size() >= 1 && data.unit.size() <= 30 &&
+        data.stockCount is number && data.stockCount >= 0 && data.stockCount <= 1000000 &&
+        data.reorderPoint is number && data.reorderPoint >= 0 && data.reorderPoint <= 100000 &&
+        data.minOrderQty is number && data.minOrderQty >= 1 && data.minOrderQty <= 100000 &&
+        data.leadTimeDays is number && data.leadTimeDays >= 0 && data.leadTimeDays <= 365 &&
+        data.description is string && data.description.size() >= 10 && data.description.size() <= 800 &&
+        data.city is string && data.city.size() >= 2 && data.city.size() <= 60 &&
+        data.district is string && data.district.size() >= 2 && data.district.size() <= 80 &&
+        data.lat is number && data.lat >= -90 && data.lat <= 90 &&
+        data.lng is number && data.lng >= -180 && data.lng <= 180 &&
+        data.visualKey is string && data.visualKey.size() >= 2 && data.visualKey.size() <= 60 &&
+        data.status is string && data.status.size() <= 20 &&
+        (data.status == 'active' || data.status == 'draft' || data.status == 'archived') &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidInquiry(data) {
+      return data.keys().hasAll([
+          'listingId', 'listingTitle', 'sellerId', 'sellerOwnerId', 'sellerName',
+          'buyerId', 'buyerName', 'buyerLocation', 'requestedQty',
+          'targetPrice', 'preferredContactMethod', 'message',
+          'sellerReply', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'listingId', 'listingTitle', 'sellerId', 'sellerOwnerId', 'sellerName',
+          'buyerId', 'buyerName', 'buyerLocation', 'requestedQty',
+          'targetPrice', 'preferredContactMethod', 'message',
+          'sellerReply', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.listingId is string && data.listingId.size() >= 1 && data.listingId.size() <= 128 && data.listingId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.listingTitle is string && data.listingTitle.size() >= 3 && data.listingTitle.size() <= 140 &&
+        data.sellerId is string && data.sellerId.size() >= 1 && data.sellerId.size() <= 128 && data.sellerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.sellerOwnerId is string && data.sellerOwnerId.size() >= 1 && data.sellerOwnerId.size() <= 128 && data.sellerOwnerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.sellerName is string && data.sellerName.size() >= 2 && data.sellerName.size() <= 100 &&
+        data.buyerId is string && data.buyerId.size() >= 1 && data.buyerId.size() <= 128 && data.buyerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        (data.buyerId == request.auth.uid || data.sellerOwnerId == request.auth.uid) &&
+        data.buyerName is string && data.buyerName.size() >= 2 && data.buyerName.size() <= 100 &&
+        data.buyerLocation is string && data.buyerLocation.size() >= 2 && data.buyerLocation.size() <= 80 &&
+        data.requestedQty is number && data.requestedQty >= 1 && data.requestedQty <= 1000000 &&
+        data.targetPrice is number && data.targetPrice >= 0 && data.targetPrice <= 10000000 &&
+        data.preferredContactMethod is string && data.preferredContactMethod.size() <= 30 &&
+        (data.preferredContactMethod == 'portal' || data.preferredContactMethod == 'phone_callback' || data.preferredContactMethod == 'site_visit') &&
+        data.message is string && data.message.size() >= 5 && data.message.size() <= 600 &&
+        data.sellerReply is string && data.sellerReply.size() >= 0 && data.sellerReply.size() <= 600 &&
+        data.status is string && data.status.size() <= 20 &&
+        (data.status == 'open' || data.status == 'responded' || data.status == 'closed') &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // 4. Collection Rules
+
+    // A. Admins Collection
+    match /admins/{adminId} {
+      allow get: if isVerifiedUser() && isValidId(adminId) && (request.auth.uid == adminId || isAdmin());
+      allow list: if false;
+      allow create: if isAdmin() && isValidId(adminId) && isValidAdmin(incoming()) && incoming().createdAt == request.time;
+      allow update, delete: if false;
+    }
+
+    // B. Public Seller Storefronts (No PII; split from seller_private)
+    match /sellers/{sellerId} {
+      allow get: if isValidId(sellerId) && (
+        existing().status == 'active' ||
+        (isSignedIn() && existing().ownerId == request.auth.uid) ||
+        isAdmin()
+      );
+      allow list: if existing().status == 'active' || (isSignedIn() && existing().ownerId == request.auth.uid);
+
+      allow create: if isVerifiedUser() &&
+        isValidId(sellerId) &&
+        isValidSellerPublic(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        existsAfter(/databases/$(database)/documents/seller_private/$(sellerId));
+
+      allow update: if isVerifiedUser() &&
+        isValidId(sellerId) &&
+        isValidSellerPublic(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          // Action 1: Owner updates storefront location, radius, or compliance badge atomically with seller_private
+          (existing().ownerId == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'businessName', 'category', 'city', 'district', 'lat', 'lng',
+              'gstinMasked', 'isVerified', 'verificationStatus', 'serviceRadiusKm', 'updatedAt'
+            ]) &&
+            existsAfter(/databases/$(database)/documents/seller_private/$(sellerId))
+          )
+        );
+
+      allow delete: if isAdmin() && isValidId(sellerId);
+    }
+
+    // C. Isolated Seller Compliance & Contact PII (Split Collection Strategy)
+    match /seller_private/{sellerId} {
+      allow get: if isVerifiedUser() && isValidId(sellerId) && (
+        existing().ownerId == request.auth.uid || isAdmin()
+      );
+      allow list: if false;
+
+      allow create: if isVerifiedUser() &&
+        isValidId(sellerId) &&
+        isValidSellerPrivate(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        existsAfter(/databases/$(database)/documents/sellers/$(sellerId));
+
+      allow update: if isVerifiedUser() &&
+        isValidId(sellerId) &&
+        isValidSellerPrivate(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          // Action 1: Owner updates KYC / compliance documents atomically with sellers
+          (existing().ownerId == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'taxIdFull', 'tradeLicenseNumber', 'isoCertRef',
+              'registeredStreet', 'contactPhone', 'contactEmail', 'updatedAt'
+            ]) &&
+            existsAfter(/databases/$(database)/documents/sellers/$(sellerId))
+          )
+        );
+
+      allow delete: if isAdmin() && isValidId(sellerId);
+    }
+
+    // D. Listings Collection (Products & Local Services)
+    match /listings/{listingId} {
+      allow get: if isValidId(listingId) && (
+        existing().status == 'active' ||
+        (isSignedIn() && existing().ownerId == request.auth.uid) ||
+        isAdmin()
+      );
+      allow list: if existing().status == 'active' || (isSignedIn() && existing().ownerId == request.auth.uid);
+
+      allow create: if isVerifiedUser() &&
+        isValidId(listingId) &&
+        isValidListing(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        exists(/databases/$(database)/documents/sellers/$(incoming().sellerId)) &&
+        get(/databases/$(database)/documents/sellers/$(incoming().sellerId)).data.ownerId == request.auth.uid;
+
+      allow update: if isVerifiedUser() &&
+        isValidId(listingId) &&
+        isValidListing(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().sellerId == existing().sellerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (existing().status != 'archived' || isAdmin()) && (
+          isAdmin() ||
+          // Action 1: Quick Inventory Stock & Price Adjustment
+          (existing().ownerId == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'price', 'stockCount', 'reorderPoint', 'leadTimeDays', 'status', 'updatedAt'
+            ])
+          ) ||
+          // Action 2: Full Catalog Specification Edit
+          (existing().ownerId == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'category', 'listingType', 'productGroupKey', 'price', 'unit',
+              'stockCount', 'reorderPoint', 'minOrderQty', 'leadTimeDays',
+              'description', 'city', 'district', 'lat', 'lng', 'sellerVerified', 'status', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isVerifiedUser() && isValidId(listingId) && (
+        existing().ownerId == request.auth.uid || isAdmin()
+      );
+    }
+
+    // E. Direct Customer Inquiries Collection
+    match /inquiries/{inquiryId} {
+      allow get: if isSignedIn() && isValidId(inquiryId) && (
+        existing().buyerId == request.auth.uid ||
+        existing().sellerOwnerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow list: if isSignedIn() && (
+        existing().buyerId == request.auth.uid ||
+        existing().sellerOwnerId == request.auth.uid
+      );
+
+      allow create: if isVerifiedUser() &&
+        isValidId(inquiryId) &&
+        isValidInquiry(incoming()) &&
+        incoming().buyerId == request.auth.uid &&
+        incoming().status == 'open' &&
+        incoming().sellerReply == '' &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        exists(/databases/$(database)/documents/listings/$(incoming().listingId)) &&
+        exists(/databases/$(database)/documents/sellers/$(incoming().sellerId)) &&
+        get(/databases/$(database)/documents/sellers/$(incoming().sellerId)).data.ownerId == incoming().sellerOwnerId;
+
+      allow update: if isVerifiedUser() &&
+        isValidId(inquiryId) &&
+        isValidInquiry(incoming()) &&
+        incoming().listingId == existing().listingId &&
+        incoming().sellerId == existing().sellerId &&
+        incoming().sellerOwnerId == existing().sellerOwnerId &&
+        incoming().buyerId == existing().buyerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (existing().status != 'closed' || isAdmin()) && (
+          isAdmin() ||
+          // Action 1: Seller Responds to Inquiry or Closes Thread
+          (existing().sellerOwnerId == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'sellerReply', 'status', 'updatedAt'
+            ])
+          ) ||
+          // Action 2: Buyer Updates Inquiry Terms or Closes Thread
+          (existing().buyerId == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'requestedQty', 'targetPrice', 'message', 'status', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isAdmin() && isValidId(inquiryId);
+    }
+  }
+}
